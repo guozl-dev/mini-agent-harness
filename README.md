@@ -8,8 +8,8 @@
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| Phase 0 | 工程底座 + LLM Provider 抽象层（重试/超时/结构化输出/fake provider） | ✅ 进行中 |
-| Phase 1 | Harness 内核：任务循环状态机、SQLite 状态持久化、上下文预算裁剪、工具 allowlist | ⬜ 计划中 |
+| Phase 0 | 工程底座 + LLM Provider 抽象层（重试/超时/结构化输出/fake provider） | ✅ 已完成 |
+| Phase 1 | Harness 内核：任务循环状态机、SQLite 状态持久化、上下文预算裁剪、工具 allowlist | ✅ 已完成 |
 | Phase 2 | AI 自闭环：pytest 沙箱 → 机器可读反馈 → 改码 → 重跑直到全绿（可演示） | ⬜ 计划中 |
 | Phase 3 | 分层记忆：工作/情景/长期 + 离线巩固 + 遗忘与污染防护 | ⬜ 计划中 |
 | Phase 4 | 规划式召回（超越向量 top-k）+ 工程纪律（e2e/mock/覆盖率门槛/CI 门禁）+ v0.1.0 | ⬜ 计划中 |
@@ -36,10 +36,35 @@ src/mini_harness/
   llm/
     types.py       # Message / ToolSpec / ChatResponse 等数据模型（pydantic）
     provider.py    # Provider 抽象 + OpenAI 兼容实现（重试/超时）+ FakeProvider
+  core/
+    loop.py        # AgentLoop 状态机：PLANNING→ACTING→OBSERVING→FINISHED/FAILED
+    state.py       # SQLite 三级持久化：runs / steps / tool_calls（支持断点续跑）
+    context.py     # 上下文预算三级策略：externalize → summarize → hard trim
+    tools.py       # 工具注册 + allowlist + 超时 + 路径越界拦截（异常转观察结果）
 tests/
-  test_provider.py # FakeProvider 行为与数据模型校验
 docs/roadmap.md    # 四阶段路线与验收标准
 .github/workflows/ci.yml
+```
+
+## 最小示例
+
+```python
+from mini_harness.core.loop import AgentLoop
+from mini_harness.core.state import StateStore
+from mini_harness.core.tools import ToolRegistry
+from mini_harness.llm.provider import FakeProvider
+from mini_harness.llm.types import ToolSpec
+
+registry = ToolRegistry(timeout_s=3)
+registry.register(
+    ToolSpec(name="echo", description="echo text", parameters={"type": "object"}),
+    lambda text: f"echo:{text}",
+)
+loop = AgentLoop(FakeProvider(["hello from the harness"]), tools=registry, store=StateStore())
+
+result = loop.run("say hello")
+print(result.status, result.steps, result.content)   # finished 1 hello from the harness
+print(loop.history(result.run_id).tool_calls)        # 每次工具调用都有审计记录
 ```
 
 ## License
