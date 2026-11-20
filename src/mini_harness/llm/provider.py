@@ -175,6 +175,14 @@ class OpenAICompatibleProvider(LLMProvider):
 
     def _parse(self, data: dict[str, Any]) -> ChatResponse:
         choice = data["choices"][0]["message"]
+        raw_content = choice.get("content")
+        if isinstance(raw_content, list):
+            # Some gateways return content parts: [{"type": "text", "text": "..."}]
+            content = "".join(
+                part.get("text", "") for part in raw_content if isinstance(part, dict)
+            )
+        else:
+            content = raw_content or ""
         tool_calls: list[ToolCall] = []
         for idx, call in enumerate(choice.get("tool_calls") or []):
             raw_args = call.get("function", {}).get("arguments") or "{}"
@@ -190,7 +198,7 @@ class OpenAICompatibleProvider(LLMProvider):
                 )
             )
         return ChatResponse(
-            content=choice.get("content") or "",
+            content=content,
             tool_calls=tool_calls,
             model=data.get("model"),
             usage=data.get("usage") or {},

@@ -63,6 +63,36 @@ def test_with_retry_raises_provider_error_after_exhausting() -> None:
         with_retry(always_fail, max_retries=2, sleep=lambda _: None, jitter=lambda: 0.0)
 
 
+def test_chat_response_accepts_nested_usage() -> None:
+    response = ChatResponse(
+        content="hi",
+        usage={"prompt_tokens": 3, "prompt_tokens_details": {"cached_tokens": 0}},
+    )
+
+    assert response.usage["prompt_tokens_details"]["cached_tokens"] == 0
+
+
+def test_parse_normalizes_content_parts() -> None:
+    provider = OpenAICompatibleProvider(
+        base_url="http://127.0.0.1:1/v1", api_key="sk-test", model="demo"
+    )
+    payload = {
+        "model": "demo",
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "你"}, {"type": "text", "text": "好"}],
+                }
+            }
+        ],
+    }
+
+    parsed = provider._parse(payload)
+
+    assert parsed.content == "你好"
+
+
 def test_from_env_builds_provider(monkeypatch) -> None:
     monkeypatch.setenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
     monkeypatch.setenv("LLM_API_KEY", "sk-test")

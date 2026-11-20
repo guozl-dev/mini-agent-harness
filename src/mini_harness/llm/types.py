@@ -40,7 +40,7 @@ class ChatResponse(BaseModel):
     content: str = ""
     tool_calls: list[ToolCall] = Field(default_factory=list)
     model: str | None = None
-    usage: dict[str, int] = Field(default_factory=dict)
+    usage: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def has_tool_calls(self) -> bool:
