@@ -16,6 +16,7 @@ from enum import StrEnum
 from ..llm.provider import LLMProvider
 from ..llm.types import Message
 from .context import ContextManager
+from .memory import MemoryStore
 from .state import RunRecord, StateStore
 from .tools import ToolRegistry
 
@@ -44,6 +45,7 @@ class AgentLoop:
         tools: ToolRegistry | None = None,
         store: StateStore | None = None,
         context: ContextManager | None = None,
+        memory: MemoryStore | None = None,
         max_steps: int = 8,
         system_prompt: str = "You are a careful agent. Use tools when needed.",
     ) -> None:
@@ -53,6 +55,7 @@ class AgentLoop:
         self.tools = tools
         self.store = store or StateStore()
         self.context = context or ContextManager()
+        self.memory = memory
         self.max_steps = max_steps
         self.system_prompt = system_prompt
         self.state: LoopState = LoopState.PLANNING
@@ -60,11 +63,16 @@ class AgentLoop:
     # -- public ---------------------------------------------------------
     def run(self, task: str) -> RunResult:
         run_id = self.store.create_run(task)
-        messages = [
-            Message(role="system", content=self.system_prompt),
-            Message(role="user", content=task),
-        ]
-        return self._drive(run_id, messages, start_step=1)
+        messages = [Message(role="system", content=self.system_prompt)]
+        if self.memory is not None:
+            block = self.memory.context_block(task)
+            if block:
+                messages.append(Message(role="system", content=block))
+        messages.append(Message(role="user", content=task))
+        result = self._drive(run_id, messages, start_step=1)
+        if self.memory is not None and result.status == "finished":
+            self.memory.add_episode(run_id, f"task: {task}\nresult: {result.content}")
+        return result
 
     def resume(self, run_id: str) -> RunResult:
         record = self.store.get_run(run_id)

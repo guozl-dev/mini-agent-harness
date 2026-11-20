@@ -11,7 +11,7 @@
 | Phase 0 | 工程底座 + LLM Provider 抽象层（重试/超时/结构化输出/fake provider） | ✅ 已完成 |
 | Phase 1 | Harness 内核：任务循环状态机、SQLite 状态持久化、上下文预算裁剪、工具 allowlist | ✅ 已完成 |
 | Phase 2 | AI 自闭环：pytest 沙箱 → 机器可读反馈 → 改码 → 重跑直到全绿（可演示） | ✅ 已完成 |
-| Phase 3 | 分层记忆：工作/情景/长期 + 离线巩固 + 遗忘与污染防护 | ⬜ 计划中 |
+| Phase 3 | 分层记忆：工作/情景/长期 + 离线巩固 + 遗忘与污染防护 | ✅ 已完成 |
 | Phase 4 | 规划式召回（超越向量 top-k）+ 工程纪律（e2e/mock/覆盖率门槛/CI 门禁）+ v0.1.0 | ⬜ 计划中 |
 
 ## 设计取舍（为什么不用现成框架）
@@ -43,6 +43,7 @@ src/mini_harness/
     tools.py       # 工具注册 + allowlist + 超时 + 路径越界拦截（异常转观察结果）
     sandbox.py     # pytest 沙箱：临时副本执行，解析 junit-xml 为结构化失败
     repair.py      # RepairLoop：结构化补丁 → 校验（禁改测试/禁路径穿越）→ 重跑收敛
+    memory.py      # 分层记忆：情景/长期 + 离线巩固（幂等）+ 遗忘 + 冲突挂起
 examples/buggy_project/   # 演示靶场：3 个故意写坏的缺陷
 scripts/demo_repair.py    # 离线演示：脚本化 provider，零成本可复现
 tests/
@@ -89,6 +90,31 @@ final  : passed=3 failed=0
 模型返回结构化补丁 JSON → 校验（**禁止修改 tests/、禁止路径穿越**）→ 写回 → 重跑，
 直到全绿或达最大尝试次数。替换为真实模型只需把 `FakeProvider` 换成
 `OpenAICompatibleProvider(base_url, api_key, model)`。
+
+## 分层记忆（Phase 3）
+
+三层结构与三条保护：
+
+| 层 | 载体 | 说明 |
+|---|---|---|
+| 工作记忆 | `ContextManager` | 当前对话窗口，预算裁剪（不外置存储） |
+| 情景记忆 | SQLite `episodes` | 每次会话/运行的任务与结果摘要 |
+| 长期记忆 | SQLite `facts` | 带 `key`/`confidence`/`source` 的稳定事实 |
+
+```python
+from mini_harness.core.memory import MemoryStore
+
+memory = MemoryStore("memory.sqlite")
+memory.add_episode("s1", "用户说：以后回答先给结论")
+memory.consolidate("s1", summarizer)      # 情景 → 长期事实（幂等，重复执行返回 0）
+memory.recall("回答偏好")                  # 命中后 hits/last_used_at 自动更新
+memory.forget(ttl_days=30, max_facts=50)  # 过期归档 + 容量上限
+```
+
+- **离线巩固幂等**：只处理未巩固的 episode，重复调用不产生重复事实；
+- **遗忘**：TTL 过期 + 容量裁剪（按 hits/confidence 排序，低分先归档）；
+- **污染防护**：同一 `key` 的事实冲突时**不静默覆盖**，新事实以 `pending` 状态挂起并可审计；
+- `AgentLoop(memory=...)` 会在运行时自动注入 `[记忆]` 块，并在运行结束后写入 episode。
 
 ## License
 

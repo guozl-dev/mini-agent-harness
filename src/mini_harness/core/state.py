@@ -181,3 +181,15 @@ class StateStore:
 
     def close(self) -> None:
         self._db.close()
+
+    def __enter__(self) -> StateStore:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
+
+    def __del__(self) -> None:  # pragma: no cover - safety net for tests/scripts
+        try:
+            self._db.close()
+        except Exception:  # noqa: BLE001 - already closed or never opened
+            pass
