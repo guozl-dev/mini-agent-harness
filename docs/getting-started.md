@@ -231,6 +231,26 @@ GitHub 仓库页 → **Actions → Self-Repair Demo → Run workflow**：
 
 工作流文件：`.github/workflows/self-repair.yml`。
 
+### 6.5 像聊天一样使用（多轮 REPL）
+
+```bash
+python scripts/chat.py                  # 离线演示（脚本化回复）
+python scripts/chat.py --provider env   # 真模型，需先导出 LLM_*
+```
+
+进入后直接说话，支持斜杠命令：
+
+| 命令 | 作用 |
+|---|---|
+| `/exit` | 退出 |
+| `/clear` | 清空本轮对话历史（长期记忆保留） |
+| `/history` | 查看当前上下文里的消息条数 |
+| `/memory 关键词` | 查看召回的记忆事实 |
+| `/remember` | 把本次会话巩固为长期事实（幂等） |
+
+说明：当前为逐句返回，不支持流式输出；回答质量取决于所接模型，harness 负责的是
+**多轮历史、上下文裁剪、记忆召回与落盘审计**。
+
 ---
 
 ## 7. 作为库嵌入自己的项目

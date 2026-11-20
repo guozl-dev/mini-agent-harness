@@ -33,6 +33,7 @@ python scripts/demo_repair.py           # 自闭环修复演示（零成本，�
 python scripts/demo_self_repair.py      # 给本仓库注入 bug，再让 harness 修好它
 python scripts/eval_retrieval.py        # 检索评测：naive vs planned
 python scripts/run_agent.py             # 跑一个 agent 任务（默认 FakeProvider）
+python scripts/chat.py                  # 多轮聊天模式（REPL，带记忆）
 ```
 
 接真实模型：导出 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，
@@ -63,6 +64,7 @@ scripts/demo_repair.py    # 离线演示：脚本化 provider，零成本可复�
 scripts/demo_self_repair.py # 自修演示：给本仓库注入 bug，再让 harness 修复
 scripts/eval_retrieval.py # 检索评测：naive 与 planned 的命中率对比
 scripts/run_agent.py      # 命令行入口：--provider fake|env，跑单个任务
+scripts/chat.py           # 多轮聊天 REPL：历史 + 上下文裁剪 + 记忆召回 + /remember
 scripts/run_demo.bat      # Windows 双击运行修复演示
 docs/getting-started.md   # 首次使用指南（环境/配置/验证/排错）
 docs/release-checklist.md # 发布前脱敏与安全检查清单
