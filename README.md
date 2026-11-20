@@ -23,11 +23,19 @@
 
 ## 快速开始
 
+> 完整上手文档（环境准备、真实模型配置、常见问题）：**[docs/getting-started.md](docs/getting-started.md)**
+
 ```bash
-uv venv && uv pip install -e ".[dev]"   # 或 pip install -e ".[dev]"
-cp .env.example .env                    # 填入模型 API Key（可选）
-pytest
+uv venv && uv pip install -e ".[dev]"   # 或 python -m venv .venv && pip install -e ".[dev]"
+python -m pytest                        # 期望 56 passed
+
+python scripts/demo_repair.py           # 自闭环修复演示（零成本，可直接录屏）
+python scripts/eval_retrieval.py        # 检索评测：naive vs planned
+python scripts/run_agent.py             # 跑一个 agent 任务（默认 FakeProvider）
 ```
+
+接真实模型：导出 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，
+`python scripts/run_agent.py --provider env --task "用一句话介绍你自己"`。
 
 ## 目录结构
 
@@ -51,6 +59,8 @@ examples/buggy_project/   # 演示靶场：3 个故意写坏的缺陷
 evals/                    # 检索评测语料与用例（8 篇文档 / 7 题）
 scripts/demo_repair.py    # 离线演示：脚本化 provider，零成本可复现
 scripts/eval_retrieval.py # 检索评测：naive 与 planned 的命中率对比
+scripts/run_agent.py      # 命令行入口：--provider fake|env，跑单个任务
+docs/getting-started.md   # 首次使用指南（环境/配置/验证/排错）
 tests/
 docs/roadmap.md    # 四阶段路线与验收标准
 .github/workflows/ci.yml

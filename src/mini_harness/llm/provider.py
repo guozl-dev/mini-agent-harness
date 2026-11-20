@@ -11,6 +11,7 @@ Design notes:
 from __future__ import annotations
 
 import json
+import os
 import random
 import time
 from collections.abc import Callable, Sequence
@@ -102,12 +103,42 @@ class OpenAICompatibleProvider(LLMProvider):
     ) -> None:
         import httpx  # local import keeps the package importable without httpx
 
+        self.base_url = base_url.rstrip("/")
         self._model = model
         self._max_retries = max_retries
         self._client = httpx.Client(
-            base_url=base_url.rstrip("/"),
+            base_url=self.base_url,
             headers={"Authorization": f"Bearer {api_key}"},
             timeout=timeout,
+        )
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @classmethod
+    def from_env(cls, *, prefix: str = "LLM_") -> OpenAICompatibleProvider:
+        """Build a provider from ``LLM_BASE_URL`` / ``LLM_API_KEY`` / ``LLM_MODEL``.
+
+        See ``.env.example`` for the expected shape. Raises ``ProviderError`` with
+        an actionable message when a variable is missing, so onboarding failures
+        are self-explaining instead of a 401 three layers deep.
+        """
+        keys = ("BASE_URL", "API_KEY", "MODEL")
+        values = {key: os.environ.get(f"{prefix}{key}") for key in keys}
+        missing = [f"{prefix}{key}" for key, value in values.items() if not value]
+        if missing:
+            raise ProviderError(
+                "missing environment variables: "
+                + ", ".join(missing)
+                + "; copy .env.example and export them first"
+            )
+        return cls(
+            base_url=str(values["BASE_URL"]),
+            api_key=str(values["API_KEY"]),
+            model=str(values["MODEL"]),
+            timeout=float(os.environ.get(f"{prefix}TIMEOUT", "60")),
+            max_retries=int(os.environ.get(f"{prefix}MAX_RETRIES", "3")),
         )
 
     def complete(

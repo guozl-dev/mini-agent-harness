@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from mini_harness.llm.provider import FakeProvider, ProviderError, with_retry
+from mini_harness.llm.provider import (
+    FakeProvider,
+    OpenAICompatibleProvider,
+    ProviderError,
+    with_retry,
+)
 from mini_harness.llm.types import ChatResponse, Message, ToolCall
 
 
@@ -56,3 +61,25 @@ def test_with_retry_raises_provider_error_after_exhausting() -> None:
 
     with pytest.raises(ProviderError):
         with_retry(always_fail, max_retries=2, sleep=lambda _: None, jitter=lambda: 0.0)
+
+
+def test_from_env_builds_provider(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
+    monkeypatch.setenv("LLM_API_KEY", "sk-test")
+    monkeypatch.setenv("LLM_MODEL", "deepseek-chat")
+
+    provider = OpenAICompatibleProvider.from_env()
+
+    assert provider.base_url == "https://api.deepseek.com/v1"
+    assert provider.model == "deepseek-chat"
+
+
+def test_from_env_reports_actionable_error(monkeypatch) -> None:
+    for key in ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+
+    with pytest.raises(ProviderError) as info:
+        OpenAICompatibleProvider.from_env()
+
+    assert "LLM_BASE_URL" in str(info.value)
+    assert ".env.example" in str(info.value)
