@@ -7,6 +7,7 @@ rootdir and keeps the workspace untouched by the sandbox itself.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -63,6 +64,13 @@ class SandboxRunner:
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache"),
         )
         report = workdir / "report.xml"
+        env = os.environ.copy()
+        src_dir = target / "src"
+        if src_dir.is_dir():
+            # Make the sandboxed copy importable even though the real package is
+            # installed in editable mode against the original checkout.
+            existing = env.get("PYTHONPATH")
+            env["PYTHONPATH"] = str(src_dir) + (os.pathsep + existing if existing else "")
 
         try:
             proc = subprocess.run(
@@ -79,6 +87,7 @@ class SandboxRunner:
                 capture_output=True,
                 text=True,
                 timeout=self.timeout_s,
+                env=env,
             )
         except subprocess.TimeoutExpired:
             return SuiteResult(errors=1, output=f"sandbox timeout after {self.timeout_s}s")

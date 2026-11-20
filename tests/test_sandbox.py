@@ -45,3 +45,17 @@ def test_sandbox_does_not_mutate_the_source_project(tmp_path) -> None:
     SandboxRunner(project).run()
 
     assert (project / "calc.py").read_text(encoding="utf-8") == before
+
+
+def test_sandbox_puts_project_src_on_pythonpath(tmp_path) -> None:
+    (tmp_path / "src" / "demo_pkg").mkdir(parents=True)
+    (tmp_path / "src" / "demo_pkg" / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_pkg.py").write_text(
+        "from demo_pkg import VALUE\n\n\ndef test_value():\n    assert VALUE == 2\n",
+        encoding="utf-8",
+    )
+
+    result = SandboxRunner(tmp_path).run()
+
+    assert result.failed == 1  # imported from the copy's src/, not the installed package

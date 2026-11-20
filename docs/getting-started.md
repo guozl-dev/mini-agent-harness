@@ -84,12 +84,12 @@ pip install -e ".[dev]" -i https://pypi.tuna.tsinghua.edu.cn/simple
 ## 4. 验证安装
 
 ```bash
-python -m pytest                 # 期望：56 passed
+python -m pytest                 # 期望：57 passed
 python -m ruff check .           # 期望：All checks passed!
 python -m pytest --cov           # 期望：覆盖率约 93%
 ```
 
-看到 `56 passed` 即表示环境完全就绪（不需要任何 API Key，测试全部走 FakeProvider）。
+看到 `57 passed` 即表示环境完全就绪（不需要任何 API Key，测试全部走 FakeProvider）。
 
 ---
 
@@ -163,6 +163,25 @@ final  : passed=3 failed=0
 
 含义：沙箱跑测试发现 3 个失败 → 模型返回结构化补丁 → 校验后写回 → 重跑全绿。
 
+### 6.1b 修「本项目自己」的 bug（更有说服力）
+
+```bash
+python scripts/demo_self_repair.py            # 脚本化补丁，零成本
+python scripts/demo_self_repair.py --provider env   # 真模型来修
+```
+
+期望输出：
+
+```
+injected bug: src/mini_harness/core/evaluation.py (hit_rate denominator off by one)
+status     : finished
+attempt 1: failed=0 changed=['src/mini_harness/core/evaluation.py']
+final      : passed=57 failed=0
+restored   : True
+```
+
+会先把仓库复制到临时目录、故意改坏 `hit_rate` 的计算，再让 harness 自己修好并校验还原。
+
 ### 6.2 检索评测对比（不花钱，5 秒）
 
 ```bash
@@ -200,6 +219,17 @@ run_id : 9d47aa2e...
 ```
 
 `agent_runs.sqlite`（运行审计）与 `agent_memory.sqlite`（记忆）会自动生成在项目根目录，可随时删除。
+
+### 6.4 在 CI 里跑自修演示（可选）
+
+GitHub 仓库页 → **Actions → Self-Repair Demo → Run workflow**：
+
+| 选项 | 说明 |
+|---|---|
+| `fake` | 脚本化补丁，不需要任何密钥 |
+| `env` | 用真实模型，需先在 **Settings → Secrets and variables → Actions** 配置 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` |
+
+工作流文件：`.github/workflows/self-repair.yml`。
 
 ---
 
@@ -275,7 +305,10 @@ for call in loop.history(result.run_id).tool_calls:
 | 评测语料仅 8 篇 / 7 题 | 指标参考性有限 | `evals/corpus.json`、`evals/cases.json` 扩充 |
 | 无 CONTRIBUTING / Issue 模板 | 协作规范缺失（个人项目可暂缓） | `.github/CONTRIBUTING.md`、`.github/ISSUE_TEMPLATE/` |
 
-> 本次已补齐：`OpenAICompatibleProvider.from_env()`（`src/mini_harness/llm/provider.py`）与命令行入口脚本 `scripts/run_agent.py`，并补了对应测试。
+> 本次已补齐：`OpenAICompatibleProvider.from_env()`（`src/mini_harness/llm/provider.py`）、
+> 命令行入口 `scripts/run_agent.py`、真模型修复开关 `--provider env`（`scripts/demo_repair.py`、
+> `scripts/demo_self_repair.py`）、自修 CI 工作流 `.github/workflows/self-repair.yml`、
+> Windows 双击脚本 `scripts/run_demo.bat`，并补了对应测试。
 
 ---
 

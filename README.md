@@ -27,15 +27,17 @@
 
 ```bash
 uv venv && uv pip install -e ".[dev]"   # 或 python -m venv .venv && pip install -e ".[dev]"
-python -m pytest                        # 期望 56 passed
+python -m pytest                        # 期望 57 passed
 
 python scripts/demo_repair.py           # 自闭环修复演示（零成本，可直接录屏）
+python scripts/demo_self_repair.py      # 给本仓库注入 bug，再让 harness 修好它
 python scripts/eval_retrieval.py        # 检索评测：naive vs planned
 python scripts/run_agent.py             # 跑一个 agent 任务（默认 FakeProvider）
 ```
 
 接真实模型：导出 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，
-`python scripts/run_agent.py --provider env --task "用一句话介绍你自己"`。
+`python scripts/run_agent.py --provider env --task "用一句话介绍你自己"`，
+或让真模型来修 bug：`python scripts/demo_self_repair.py --provider env`。
 
 ## 目录结构
 
@@ -58,9 +60,12 @@ src/mini_harness/
 examples/buggy_project/   # 演示靶场：3 个故意写坏的缺陷
 evals/                    # 检索评测语料与用例（8 篇文档 / 7 题）
 scripts/demo_repair.py    # 离线演示：脚本化 provider，零成本可复现
+scripts/demo_self_repair.py # 自修演示：给本仓库注入 bug，再让 harness 修复
 scripts/eval_retrieval.py # 检索评测：naive 与 planned 的命中率对比
 scripts/run_agent.py      # 命令行入口：--provider fake|env，跑单个任务
+scripts/run_demo.bat      # Windows 双击运行修复演示
 docs/getting-started.md   # 首次使用指南（环境/配置/验证/排错）
+.github/workflows/self-repair.yml # 手动触发：在 CI 里跑自修演示（可选真模型）
 tests/
 docs/roadmap.md    # 四阶段路线与验收标准
 .github/workflows/ci.yml
@@ -105,6 +110,31 @@ final  : passed=3 failed=0
 模型返回结构化补丁 JSON → 校验（**禁止修改 tests/、禁止路径穿越**）→ 写回 → 重跑，
 直到全绿或达最大尝试次数。替换为真实模型只需把 `FakeProvider` 换成
 `OpenAICompatibleProvider(base_url, api_key, model)`。
+
+### 修自己的仓库（更有说服力）
+
+```bash
+python scripts/demo_self_repair.py            # 脚本化补丁，零成本
+python scripts/demo_self_repair.py --provider env   # 真模型来修
+```
+
+输出：
+
+```
+injected bug: src/mini_harness/core/evaluation.py (hit_rate denominator off by one)
+status     : finished
+attempt 1: failed=0 changed=['src/mini_harness/core/evaluation.py']
+final      : passed=57 failed=0
+restored   : True
+```
+
+做的是：把仓库复制到临时目录 → 故意改坏 `hit_rate` 的计算 → 让 harness 自己发现、
+修补、重跑到全绿，最后校验源码已还原。这就是 JD 里“你负责的模块里 AI 自己收敛”
+的最小可演示版本。
+
+也可以在 GitHub Actions 里跑：**Actions → Self-Repair Demo → Run workflow**，
+选 `fake`（无需密钥）或 `env`（需先在仓库 Settings → Secrets 里配置
+`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`）。
 
 ## 分层记忆（Phase 3）
 
