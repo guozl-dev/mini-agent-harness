@@ -65,7 +65,9 @@ scripts/eval_retrieval.py # 检索评测：naive 与 planned 的命中率对比
 scripts/run_agent.py      # 命令行入口：--provider fake|env，跑单个任务
 scripts/run_demo.bat      # Windows 双击运行修复演示
 docs/getting-started.md   # 首次使用指南（环境/配置/验证/排错）
+docs/release-checklist.md # 发布前脱敏与安全检查清单
 .github/workflows/self-repair.yml # 手动触发：在 CI 里跑自修演示（可选真模型）
+.github/workflows/secret-scan.yml # 每次 push/PR 用 gitleaks 扫描密钥泄露
 tests/
 docs/roadmap.md    # 四阶段路线与验收标准
 .github/workflows/ci.yml

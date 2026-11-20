@@ -1,0 +1,8 @@
+# gitleaks 配置：示例文件里的占位符不算泄露
+# 文档见 docs/release-checklist.md
+
+[allowlist]
+description = "Placeholder credentials in the example env file"
+paths = [
+  '''\.env\.example$''',
+]
