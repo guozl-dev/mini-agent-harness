@@ -1,0 +1,9 @@
+[
+  {"question": "程序崩了以后还能接着跑吗", "expected_ids": ["d2"]},
+  {"question": "聊得太久窗口装不下该怎么办", "expected_ids": ["d3"]},
+  {"question": "模型要是乱改测试文件怎么办", "expected_ids": ["d4"]},
+  {"question": "怎么比较两种方案的好坏并给出数字", "expected_ids": ["d7"]},
+  {"question": "同样的错误反复出现会不会被重复记住", "expected_ids": ["d5"]},
+  {"question": "改完代码怎么确认真的修好了", "expected_ids": ["d6"]},
+  {"question": "pytest 失败怎么解析", "expected_ids": ["d6"]}
+]

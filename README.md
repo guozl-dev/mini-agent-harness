@@ -12,7 +12,7 @@
 | Phase 1 | Harness 内核：任务循环状态机、SQLite 状态持久化、上下文预算裁剪、工具 allowlist | ✅ 已完成 |
 | Phase 2 | AI 自闭环：pytest 沙箱 → 机器可读反馈 → 改码 → 重跑直到全绿（可演示） | ✅ 已完成 |
 | Phase 3 | 分层记忆：工作/情景/长期 + 离线巩固 + 遗忘与污染防护 | ✅ 已完成 |
-| Phase 4 | 规划式召回（超越向量 top-k）+ 工程纪律（e2e/mock/覆盖率门槛/CI 门禁）+ v0.1.0 | ⬜ 计划中 |
+| Phase 4 | 规划式召回（超越向量 top-k）+ 工程纪律（e2e/mock/覆盖率门槛/CI 门禁）+ v0.1.0 | ✅ 已完成 |
 
 ## 设计取舍（为什么不用现成框架）
 
@@ -44,8 +44,13 @@ src/mini_harness/
     sandbox.py     # pytest 沙箱：临时副本执行，解析 junit-xml 为结构化失败
     repair.py      # RepairLoop：结构化补丁 → 校验（禁改测试/禁路径穿越）→ 重跑收敛
     memory.py      # 分层记忆：情景/长期 + 离线巩固（幂等）+ 遗忘 + 冲突挂起
+    retrieval.py   # 朴素 top-k 基线 vs 规划式召回（子查询 + 关键词 + 合并重排）
+    evaluation.py  # 检索评测：Hit@k / MRR + Markdown 报表
+    textutil.py    # 共享 bigram 相似度（记忆与检索复用，避免口径分裂）
 examples/buggy_project/   # 演示靶场：3 个故意写坏的缺陷
+evals/                    # 检索评测语料与用例（8 篇文档 / 7 题）
 scripts/demo_repair.py    # 离线演示：脚本化 provider，零成本可复现
+scripts/eval_retrieval.py # 检索评测：naive 与 planned 的命中率对比
 tests/
 docs/roadmap.md    # 四阶段路线与验收标准
 .github/workflows/ci.yml
@@ -115,6 +120,20 @@ memory.forget(ttl_days=30, max_facts=50)  # 过期归档 + 容量上限
 - **遗忘**：TTL 过期 + 容量裁剪（按 hits/confidence 排序，低分先归档）；
 - **污染防护**：同一 `key` 的事实冲突时**不静默覆盖**，新事实以 `pending` 状态挂起并可审计；
 - `AgentLoop(memory=...)` 会在运行时自动注入 `[记忆]` 块，并在运行结束后写入 episode。
+
+## 规划式召回评测（Phase 4）
+
+```bash
+python scripts/eval_retrieval.py
+```
+
+| Retriever | Hit@3 | MRR | Cases |
+|---|---|---|---|
+| naive-topk | 14% | 0.14 | 7 |
+| planned | 100% | 1.00 | 7 |
+
+语料 8 篇、评测集 7 题（刻意包含多跳与同义改写），**小样本、仅用于回归对比**，不代表线上效果。
+规划式召回 = LLM 拆子查询 + 关键词召回 + 多路合并重排；朴素方案是单次 bigram 相似度 top-k。
 
 ## License
 

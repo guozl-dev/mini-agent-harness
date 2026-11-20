@@ -15,13 +15,14 @@ Design notes:
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from .textutil import similarity
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS facts (
@@ -59,18 +60,6 @@ class Fact:
     hits: int
 
 
-def _bigrams(text: str) -> set[str]:
-    cleaned = re.sub(r"[\s\W_]+", "", text.lower())
-    return {cleaned[i : i + 2] for i in range(len(cleaned) - 1)} or {cleaned}
-
-
-def _similarity(left: str, right: str) -> float:
-    a, b = _bigrams(left), _bigrams(right)
-    if not a or not b:
-        return 0.0
-    return len(a & b) / len(a | b)
-
-
 class MemoryStore:
     def __init__(self, path: str | Path = ":memory:") -> None:
         self._path = str(path)
@@ -103,7 +92,7 @@ class MemoryStore:
         for row in self._db.execute(
             "SELECT * FROM facts WHERE status='active' AND key IS ?", (key,)
         ):
-            if _similarity(row["text"], text) >= _SIMILARITY_DEDUPE:
+            if similarity(row["text"], text) >= _SIMILARITY_DEDUPE:
                 return self._to_fact(row)
             if key is not None:
                 # Same key, different value: keep the old fact, park the new one.
@@ -126,7 +115,7 @@ class MemoryStore:
     def recall(self, query: str, *, limit: int = 5, min_score: float = 0.1) -> list[Fact]:
         scored: list[tuple[float, sqlite3.Row]] = []
         for row in self._db.execute("SELECT * FROM facts WHERE status='active'"):
-            score = _similarity(query, row["text"]) + (0.2 if row["key"] else 0.0)
+            score = similarity(query, row["text"]) + (0.2 if row["key"] else 0.0)
             if score >= min_score:
                 scored.append((score * float(row["confidence"]), row))
         scored.sort(key=lambda item: (item[0], item[1]["hits"]), reverse=True)
@@ -172,6 +161,14 @@ class MemoryStore:
             self._to_fact(row)
             for row in self._db.execute(
                 "SELECT * FROM facts WHERE status=? ORDER BY id", (status,)
+            )
+        ]
+
+    def episodes(self, session_id: str) -> list[str]:
+        return [
+            row["content"]
+            for row in self._db.execute(
+                "SELECT content FROM episodes WHERE session_id=? ORDER BY id", (session_id,)
             )
         ]
 

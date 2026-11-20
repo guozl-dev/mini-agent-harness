@@ -1,0 +1,10 @@
+[
+  {"id": "d1", "text": "AgentLoop 用状态机推进任务：PLANNING、ACTING、OBSERVING，终止条件是无工具调用、步数预算耗尽或连续失败。"},
+  {"id": "d2", "text": "StateStore 把 run、step、tool_call 三级记录写入 SQLite，进程崩溃后可以从最后快照断点续跑。"},
+  {"id": "d3", "text": "ContextManager 的预算策略分三级：工具结果外置、旧轮次滚动摘要、超过预算后硬截断。"},
+  {"id": "d4", "text": "ToolRegistry 用 allowlist 限定可调用的工具，配合超时控制和路径守卫，越权调用会被拒绝并记录。"},
+  {"id": "d5", "text": "MemoryStore（分层记忆）分工作、情景、长期三层；巩固任务把情景提炼成事实并做去重与幂等，同一 key 冲突时新事实挂起为 pending。"},
+  {"id": "d6", "text": "RepairLoop 执行 pytest 并解析 junit-xml 的失败信息，生成结构化补丁后重跑，直到全绿或达到最大尝试次数。"},
+  {"id": "d7", "text": "评测脚本对比规划式召回与朴素 top-k 的命中率与 MRR，评测集刻意包含多跳问题和同义改写。"},
+  {"id": "d8", "text": "CI 在 GitHub Actions 上用两个 Python 版本跑 ruff 与 pytest，并设置 70% 的覆盖率门槛。"}
+]
