@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from mini_harness.core.context import ContextManager  # noqa: E402
 from mini_harness.core.loop import AgentLoop  # noqa: E402
 from mini_harness.core.memory import MemoryStore  # noqa: E402
 from mini_harness.core.state import StateStore  # noqa: E402
@@ -72,6 +73,16 @@ def main() -> int:
         "--mcp-config",
         help="TOML file declaring [[mcp.servers]]; tools are registered at startup",
     )
+    parser.add_argument(
+        "--context-budget",
+        type=int,
+        help="token budget for the context manager (default 3000); raise it for tool-heavy runs",
+    )
+    parser.add_argument(
+        "--externalize-chars",
+        type=int,
+        help="results longer than this move out of context (default 600)",
+    )
     args = parser.parse_args()
 
     try:
@@ -92,12 +103,18 @@ def main() -> int:
             print(f"[mcp] {mcp.summary()}")
 
     try:
+        context_kwargs = {}
+        if args.context_budget:
+            context_kwargs["budget_tokens"] = args.context_budget
+        if args.externalize_chars:
+            context_kwargs["externalize_over_chars"] = args.externalize_chars
         loop = AgentLoop(
             provider,
             tools=registry,
             store=StateStore(ROOT / "agent_runs.sqlite"),
             memory=MemoryStore(ROOT / "agent_memory.sqlite"),
             max_steps=args.max_steps,
+            **({"context": ContextManager(**context_kwargs)} if context_kwargs else {}),
         )
         result = loop.run(args.task)
     finally:

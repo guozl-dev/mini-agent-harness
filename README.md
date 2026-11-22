@@ -121,6 +121,10 @@ call_timeout_s = 60
 ```bash
 python scripts/run_agent.py --mcp-config examples/mcp.example.toml --task "读一下 README"
 # [mcp] filesystem: 2 tools
+
+# 工具结果较长时，调大上下文预算，避免结果被外部化后模型反复重读
+python scripts/run_agent.py --mcp-config examples/mcp.example.toml \
+  --context-budget 12000 --externalize-chars 12000 --task "读 docs/mcp.md 并总结"
 ```
 
 - 工具命名 `mcp__<server>__<tool>`，超长自动截断加哈希

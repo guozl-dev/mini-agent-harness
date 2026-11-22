@@ -99,6 +99,28 @@ finally:
 | `isError: true` | 抛异常 → `ToolObservation(ok=False)`，模型能看到错误内容并自行重试 |
 | 工具不存在 | `tool_not_found` |
 
+## 实机验证（2026-11-22）
+
+用官方 `@modelcontextprotocol/server-filesystem@2.4.0`（`node` 启动，根目录 `E:/work`）跑真实任务：
+
+```
+[mcp] fs: 3 tools            # read_text_file / list_directory / directory_tree
+tool : mcp__fs__list_directory ok=True
+tool : mcp__fs__read_text_file ok=True
+status : finished
+```
+
+模型成功列出目录、读取 `docs/mcp.md` 并准确概括出全部 5 条已知限制。同一轮验证还覆盖了
+错误路径：故意给相对路径时服务器返回 `ENOENT`，该错误被转成 `ok=False` 的观察结果，
+模型据此说明“文件不存在”，没有中断运行。
+
+**工具重结果较长的场景需要调大上下文预算**，否则结果会被外部化，模型看不到内容而反复重读：
+
+```bash
+python scripts/run_agent.py --provider env --mcp-config mcp.toml \
+  --context-budget 12000 --externalize-chars 12000 --max-steps 6 --task "..."
+```
+
 ## 已知限制
 
 1. **只支持 stdio 传输**。HTTP/SSE 需要换 `MCPAdapt` 的传入形态，配置层尚未开放。
