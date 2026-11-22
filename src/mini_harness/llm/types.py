@@ -16,6 +16,9 @@ class Message(BaseModel):
     content: str = ""
     name: str | None = None
     tool_call_id: str | None = None
+    # Assistant turns that triggered tools must carry the calls back to the API,
+    # otherwise the following role="tool" message is rejected as orphaned.
+    tool_calls: list[ToolCall] | None = None
 
 
 class ToolSpec(BaseModel):

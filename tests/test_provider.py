@@ -8,6 +8,7 @@ from mini_harness.llm.provider import (
     FakeProvider,
     OpenAICompatibleProvider,
     ProviderError,
+    serialize_messages,
     with_retry,
 )
 from mini_harness.llm.types import ChatResponse, Message, ToolCall
@@ -113,3 +114,34 @@ def test_from_env_reports_actionable_error(monkeypatch) -> None:
 
     assert "LLM_BASE_URL" in str(info.value)
     assert ".env.example" in str(info.value)
+
+
+def test_serialize_messages_echoes_assistant_tool_calls() -> None:
+    """A tool message is only valid when the assistant turn declares the calls."""
+    wire = serialize_messages(
+        [
+            Message(role="user", content="列出目录"),
+            Message(
+                role="assistant",
+                content="",
+                tool_calls=[ToolCall(id="c1", name="ls", arguments={"path": "中文路径"})],
+            ),
+            Message(role="tool", content="ok", name="ls", tool_call_id="c1"),
+        ]
+    )
+
+    assistant = wire[1]
+    assert assistant["role"] == "assistant"
+    assert assistant["tool_calls"] == [
+        {
+            "id": "c1",
+            "type": "function",
+            "function": {"name": "ls", "arguments": '{"path": "中文路径"}'},
+        }
+    ]
+    assert wire[2]["tool_call_id"] == "c1"
+
+
+def test_serialize_messages_omits_empty_tool_calls() -> None:
+    wire = serialize_messages([Message(role="assistant", content="纯文本回答")])
+    assert "tool_calls" not in wire[0]

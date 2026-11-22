@@ -89,7 +89,13 @@ class AgentLoop:
             prepared = self.context.assemble(messages)
             specs = self.tools.specs() if self.tools else None
             response = self.provider.complete(prepared, specs)
-            messages.append(Message(role="assistant", content=response.content))
+            messages.append(
+                Message(
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=response.tool_calls or None,
+                )
+            )
 
             if not response.has_tool_calls:
                 self.state = LoopState.FINISHED

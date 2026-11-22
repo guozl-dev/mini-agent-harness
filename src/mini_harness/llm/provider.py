@@ -26,6 +26,32 @@ class ProviderError(RuntimeError):
     """Raised when the provider cannot produce a response after retries."""
 
 
+def serialize_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
+    """Convert internal messages to the OpenAI wire format.
+
+    An assistant turn that requested tools must echo those ``tool_calls`` back;
+    otherwise the provider rejects the following ``role="tool"`` message as
+    orphaned (DeepSeek/OpenAI both enforce this).
+    """
+    wire: list[dict[str, Any]] = []
+    for message in messages:
+        item = message.model_dump(exclude_none=True)
+        if message.role == "assistant" and message.tool_calls:
+            item["tool_calls"] = [
+                {
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": call.name,
+                        "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                    },
+                }
+                for call in message.tool_calls
+            ]
+        wire.append(item)
+    return wire
+
+
 def with_retry(
     fn: Callable[[], T],
     *,
@@ -150,7 +176,7 @@ class OpenAICompatibleProvider(LLMProvider):
     ) -> ChatResponse:
         payload: dict[str, Any] = {
             "model": self._model,
-            "messages": [m.model_dump(exclude_none=True) for m in messages],
+            "messages": serialize_messages(messages),
             "temperature": temperature,
         }
         if tools:
