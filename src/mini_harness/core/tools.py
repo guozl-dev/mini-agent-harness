@@ -32,17 +32,31 @@ class ToolRegistry:
     def __init__(self, *, timeout_s: float = 5.0, guard: Guard | None = None) -> None:
         self.timeout_s = timeout_s
         self.guard = guard
-        self._tools: dict[str, tuple[ToolSpec, ToolFn, bool]] = {}
+        self._tools: dict[str, tuple[ToolSpec, ToolFn, bool, bool]] = {}
 
-    def register(self, spec: ToolSpec, fn: ToolFn, *, allowed: bool = True) -> None:
+    def register(
+        self,
+        spec: ToolSpec,
+        fn: ToolFn,
+        *,
+        allowed: bool = True,
+        guard_exempt: bool = False,
+    ) -> None:
         if spec.name in self._tools:
             raise ValueError(f"tool already registered: {spec.name}")
-        self._tools[spec.name] = (spec, fn, allowed)
+        # guard_exempt: MCP servers legitimately reach outside the workspace
+        self._tools[spec.name] = (spec, fn, allowed, guard_exempt)
+
+    def has(self, name: str) -> bool:
+        return name in self._tools
+
+    def names(self) -> list[str]:
+        return list(self._tools)
 
     def specs(self, *, only_allowed: bool = True) -> list[ToolSpec]:
         return [
             spec
-            for spec, _, allowed in self._tools.values()
+            for spec, _, allowed, _ in self._tools.values()
             if allowed or not only_allowed
         ]
 
@@ -51,10 +65,10 @@ class ToolRegistry:
         entry = self._tools.get(call.name)
         if entry is None:
             return self._fail(call, "tool_not_found", started)
-        spec, fn, allowed = entry
+        spec, fn, allowed, guard_exempt = entry
         if not allowed:
             return self._fail(call, "tool_not_allowed", started)
-        if self.guard is not None:
+        if self.guard is not None and not guard_exempt:
             try:
                 self.guard(call)
             except Exception as exc:  # noqa: BLE001 - surfaced as observation

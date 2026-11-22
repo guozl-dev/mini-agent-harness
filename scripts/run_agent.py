@@ -29,6 +29,7 @@ from mini_harness.llm.provider import (  # noqa: E402
     ProviderError,
 )
 from mini_harness.llm.types import ChatResponse, ToolCall, ToolSpec  # noqa: E402
+from mini_harness.mcp import McpConfigError, load_mcp_config, mount_mcp  # noqa: E402
 
 DEFAULT_TASK = "用一句话说明你能做什么，并调用 now 工具报出当前时间"
 
@@ -67,6 +68,10 @@ def main() -> int:
     parser.add_argument("--task", default=DEFAULT_TASK)
     parser.add_argument("--provider", choices=["fake", "env"], default="fake")
     parser.add_argument("--max-steps", type=int, default=6)
+    parser.add_argument(
+        "--mcp-config",
+        help="TOML file declaring [[mcp.servers]]; tools are registered at startup",
+    )
     args = parser.parse_args()
 
     try:
@@ -75,14 +80,29 @@ def main() -> int:
         print(f"[config error] {exc}", file=sys.stderr)
         return 2
 
-    loop = AgentLoop(
-        provider,
-        tools=build_registry(),
-        store=StateStore(ROOT / "agent_runs.sqlite"),
-        memory=MemoryStore(ROOT / "agent_memory.sqlite"),
-        max_steps=args.max_steps,
-    )
-    result = loop.run(args.task)
+    registry = build_registry()
+    mcp = None
+    if args.mcp_config:
+        try:
+            mcp = mount_mcp(registry, load_mcp_config(args.mcp_config))
+        except McpConfigError as exc:
+            print(f"[mcp config error] {exc}", file=sys.stderr)
+            return 2
+        if mcp is not None:
+            print(f"[mcp] {mcp.summary()}")
+
+    try:
+        loop = AgentLoop(
+            provider,
+            tools=registry,
+            store=StateStore(ROOT / "agent_runs.sqlite"),
+            memory=MemoryStore(ROOT / "agent_memory.sqlite"),
+            max_steps=args.max_steps,
+        )
+        result = loop.run(args.task)
+    finally:
+        if mcp is not None:
+            mcp.close()
 
     print(f"status : {result.status}")
     print(f"steps  : {result.steps}")

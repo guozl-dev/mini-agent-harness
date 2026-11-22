@@ -1,0 +1,20 @@
+# MCP 服务器配置样例
+# 用法: python scripts/run_agent.py --mcp-config examples/mcp.example.toml --task "..."
+#
+# 注意：
+# 1. Windows 上 command 必须写 npx.cmd / uvx.exe，裸 npx 是 shim，subprocess 无法直接执行。
+# 2. allowed_tools 留空表示暴露该服务器的全部工具；生产建议显式列出。
+# 3. env 只会在白名单（PATH/SystemRoot/TEMP 等）之上追加，父进程密钥不会外泄。
+
+[[mcp.servers]]
+name = "filesystem"
+command = "npx.cmd"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "E:/work"]
+cwd = "E:/work"
+enabled = true
+allowed_tools = ["read_file", "list_directory"]
+guard_exempt = true
+connect_timeout_s = 60
+call_timeout_s = 60
+max_output_chars = 4000
+env = { NODE_NO_WARNINGS = "1" }

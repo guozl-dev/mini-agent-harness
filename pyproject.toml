@@ -9,6 +9,11 @@ authors = [{ name = "guozl-dev" }]
 dependencies = [
     "pydantic>=2.7",
     "httpx>=0.27",
+    # MCP bridge. mcp is pinned below 2.0 because mcpadapt 0.1.x imports the
+    # mcp 1.x module layout (mcp.client.streamable_http.streamablehttp_client).
+    "mcp>=1.30,<2",
+    "mcpadapt>=0.1.20",
+    "websockets>=13",
 ]
 
 [project.optional-dependencies]

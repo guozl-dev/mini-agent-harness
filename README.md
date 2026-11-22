@@ -13,11 +13,13 @@
 | Phase 2 | AI 自闭环：pytest 沙箱 → 机器可读反馈 → 改码 → 重跑直到全绿（可演示） | ✅ 已完成 |
 | Phase 3 | 分层记忆：工作/情景/长期 + 离线巩固 + 遗忘与污染防护 | ✅ 已完成 |
 | Phase 4 | 规划式召回（超越向量 top-k）+ 工程纪律（e2e/mock/覆盖率门槛/CI 门禁）+ v0.1.0 | ✅ 已完成 |
+| Phase 5 | MCP 工具接入：stdio 服务器挂载、工具命名空间、白名单、失败隔离 | ✅ 已完成 |
 
 ## 设计取舍（为什么不用现成框架）
 
 1. **可控性**：框架封装了 loop 与状态，出问题时无法定位是模型、编排还是上下文的问题；本项目的每一层都可单测。
 2. **可恢复**：状态显式落 SQLite（run/step/tool_call 三级），进程崩溃可从断点续跑。
+3. **MCP 只复用协议层**：直接用官方 `mcp` SDK 与 `mcpadapt` 的会话/同步桥，但不引入任何 agent 框架——外部工具进到 harness 后仍是 `ToolRegistry` 的普通条目，循环保持透明、可单测。
 3. **可治理**：工具走 allowlist + 超时 + 越界写拦截，异常一律转为"观察结果"回传模型，不让异常击穿 loop。
 4. **可测试**：LLM 接口化 + FakeProvider，CI 零成本、确定性、可离线。
 
@@ -52,6 +54,10 @@ src/mini_harness/
     state.py       # SQLite 三级持久化：runs / steps / tool_calls（支持断点续跑）
     context.py     # 上下文预算三级策略：externalize → summarize → hard trim
     tools.py       # 工具注册 + allowlist + 超时 + 路径越界拦截（异常转观察结果）
+  mcp/
+    config.py      # 解析 [[mcp.servers]]：命令、环境白名单、超时、工具白名单
+    adapter.py     # MCP 工具 → ToolRegistry 条目（命名空间 / 内容展平 / isError 转观察）
+    mount.py       # 逐服务器启动、失败隔离、生命周期关闭
     sandbox.py     # pytest 沙箱：临时副本执行，解析 junit-xml 为结构化失败
     repair.py      # RepairLoop：结构化补丁 → 校验（禁改测试/禁路径穿越）→ 重跑收敛
     memory.py      # 分层记忆：情景/长期 + 离线巩固（幂等）+ 遗忘 + 冲突挂起
@@ -59,6 +65,8 @@ src/mini_harness/
     evaluation.py  # 检索评测：Hit@k / MRR + Markdown 报表
     textutil.py    # 共享 bigram 相似度（记忆与检索复用，避免口径分裂）
 examples/buggy_project/   # 演示靶场：3 个故意写坏的缺陷
+examples/mcp.example.toml # MCP 服务器配置样例
+docs/mcp.md               # MCP 接入说明（配置/命名/安全/限制）
 evals/                    # 检索评测语料与用例（8 篇文档 / 7 题）
 scripts/demo_repair.py    # 离线演示：脚本化 provider，零成本可复现
 scripts/demo_self_repair.py # 自修演示：给本仓库注入 bug，再让 harness 修复
@@ -95,6 +103,32 @@ result = loop.run("say hello")
 print(result.status, result.steps, result.content)   # finished 1 hello from the harness
 print(loop.history(result.run_id).tool_calls)        # 每次工具调用都有审计记录
 ```
+
+## MCP 工具接入
+
+把 MCP 服务器的工具接进 harness，**循环与注册表核心逻辑零改动**——适配层把每个 MCP 工具注册成普通条目。
+
+```toml
+[[mcp.servers]]
+name = "filesystem"
+command = "npx.cmd"                 # Windows 必须带 .cmd
+args = ["-y", "@modelcontextprotocol/server-filesystem", "E:/work"]
+allowed_tools = ["read_file", "list_directory"]
+connect_timeout_s = 60
+call_timeout_s = 60
+```
+
+```bash
+python scripts/run_agent.py --mcp-config examples/mcp.example.toml --task "读一下 README"
+# [mcp] filesystem: 2 tools
+```
+
+- 工具命名 `mcp__<server>__<tool>`，超长自动截断加哈希
+- `isError` 转成 `ok=False` 的观察结果，模型能看到错误并自行重试
+- 子进程环境走白名单，父进程的 `LLM_API_KEY` 不会传给第三方服务器
+- 单台服务器启动失败只记录在报告里，不影响其他服务器
+
+详见 [docs/mcp.md](docs/mcp.md)。
 
 ## AI 自闭环演示（离线可复现）
 
