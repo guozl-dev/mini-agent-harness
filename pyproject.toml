@@ -11,8 +11,10 @@ dependencies = [
     "httpx>=0.27",
     # MCP bridge. mcp is pinned below 2.0 because mcpadapt 0.1.x imports the
     # mcp 1.x module layout (mcp.client.streamable_http.streamablehttp_client).
+    # mcpadapt 0.1.20 requires Python >= 3.12, so the floor stays at 0.1.19 to
+    # keep the 3.11 CI leg installable.
     "mcp>=1.30,<2",
-    "mcpadapt>=0.1.20",
+    "mcpadapt>=0.1.19",
     "websockets>=13",
 ]
 
